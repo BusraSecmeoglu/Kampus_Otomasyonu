@@ -1,0 +1,191 @@
+//Bu kodla turnikeye iki yönlü de giriþ ve çýkýþ saðlanmaktadýr.
+#include &lt;SPI.h&gt;
+#include &lt;MFRC522.h&gt;
+#include &lt;EEPROM.h&gt;
+
+#define RST_PIN 9
+#define SS_PIN 10
+#define RST_PIN2 7
+#define SS_PIN2 8
+
+MFRC522 mfrc522(SS_PIN, RST_PIN);
+MFRC522 mfrc5222(SS_PIN2, RST_PIN2);
+String lastRfid = &quot;&quot;;
+String kart1 = &quot;&quot;;
+String kart2 = &quot;&quot;;
+
+String lastRfid2 = &quot;&quot;;
+String kart12 = &quot;&quot;;
+String kart22 = &quot;&quot;;
+
+int motorPin1 = 3; // IN 1
+int motorPin2 = 4; // IN 2
+int motorPin3 = 5; // IN 3
+int motorPin4 = 6; // IN 4
+
+int motorSpeed = 1000;
+int count = 0;
+int countsperrev = 128;
+int lookup[8] = {B01000, B01100, B00100, B00110, B00010, B00011, B00001, B01001};
+
+MFRC522::MIFARE_Key key;
+MFRC522::MIFARE_Key key2;
+
+void setup()
+{
+Serial.begin(9600);
+SPI.begin();
+mfrc522.PCD_Init();
+mfrc5222.PCD_Init();
+pinMode(motorPin1, OUTPUT);
+pinMode(motorPin2, OUTPUT);
+pinMode(motorPin3, OUTPUT);
+pinMode(motorPin4, OUTPUT);
+pinMode(A0, OUTPUT);
+pinMode(A1, OUTPUT);
+pinMode(A2, OUTPUT);
+pinMode(A3, OUTPUT);
+}
+void loop()
+{
+//yeni kart okununmadýkça devam etme
+dongu();
+dongu2();
+}
+
+void dongu()
+{
+if ( ! mfrc522.PICC_IsNewCardPresent()){
+return;
+}
+if ( ! mfrc522.PICC_ReadCardSerial()) {
+
+
+return;
+}
+//kartýn UID&#39;sini oku, rfid isimli string&#39;e kaydet
+String rfid = &quot;&quot;;
+
+for (byte i = 0; i &lt; mfrc522.uid.size; i++){
+rfid += mfrc522.uid.uidByte[i] &lt; 0x10 ? &quot; 0&quot; : &quot; &quot;;
+rfid += String(mfrc522.uid.uidByte[i], HEX);
+}
+//string&#39;in boyutunu ayarla ve tamamýný büyük harfe çevir
+rfid.trim();
+rfid.toUpperCase();
+if (rfid == lastRfid)
+return;
+lastRfid = rfid;
+test();
+delay(1000);
+lastRfid=&quot;0&quot;;
+}
+
+void dongu2()
+{
+if ( ! mfrc5222.PICC_IsNewCardPresent()){
+return;
+}
+if ( ! mfrc5222.PICC_ReadCardSerial()){
+return;
+}
+//kartýn UID&#39;sini oku, rfid isimli string&#39;e kaydet
+String rfid2 = &quot;&quot;;
+for (byte i = 0; i &lt; mfrc5222.uid.size; i++) {
+
+rfid2 += mfrc5222.uid.uidByte[i] &lt; 0x10 ? &quot; 0&quot; : &quot; &quot;;
+rfid2 += String(mfrc5222.uid.uidByte[i], HEX);
+}
+//string&#39;in boyutunu ayarla ve tamamýný büyük harfe çevir
+rfid2.trim();
+rfid2.toUpperCase();
+if (rfid2 == lastRfid2)
+return;
+lastRfid2 = rfid2;
+test2();
+delay(1000);
+lastRfid2=&quot;0&quot;;
+}
+void test()
+{
+String crc_table[5] = {&quot;0x00000000&quot;, &quot;0x1db71064&quot;,&quot;00 F1 8C 7C&quot;,
+&quot;0x3b6e20c8&quot;, &quot;0x26d930ac&quot;};
+String isim_table[5]={&quot;busra&quot;, &quot;aslý&quot;, &quot;merve&quot;, &quot;seda&quot;, &quot;hale&quot;};
+for(int l=0; l&lt;5; ++l){
+if(crc_table[l]==lastRfid){
+digitalWrite(A1,HIGH);
+anticlockwise();
+delay(1000);
+digitalWrite(A1,LOW);
+delay(1000);
+return;
+}
+}
+for(int l=0; l&lt;5; ++l){
+while(crc_table[l]==lastRfid){
+; }
+
+
+}
+digitalWrite(A0,HIGH);
+delay(2000);
+digitalWrite(A0,LOW);
+delay(1000);
+}
+
+void test2()
+{
+String crc_table[5] = { &quot;0x00000000&quot;, &quot;0x1db71064&quot;,&quot;00 F1 8C 7C&quot;,
+&quot;0x3b6e20c8&quot;, &quot;0x26d930ac&quot; };
+String isim_table[5]={&quot;busra&quot;, &quot;aslý&quot;, &quot;merve&quot;, &quot;seda&quot;, &quot;hale&quot;};
+
+for(int l=0; l&lt;5; ++l){
+if(crc_table[l]==lastRfid2){
+digitalWrite(A2,LOW);
+digitalWrite(A3,HIGH);
+clockwise();
+delay(1000);
+digitalWrite(A3,LOW);
+delay(1000);
+return;
+}
+}
+for(int l=0; l&lt;5; ++l){
+while(crc_table[l]==lastRfid2){
+;
+}
+}
+digitalWrite(A2,HIGH);
+digitalWrite(A3,LOW);
+
+delay(2000);
+digitalWrite(A2,LOW);
+delay(1000);
+}
+
+void anticlockwise()
+{
+for (int i = 0; i &lt; countsperrev; i++) {
+for(int i = 0; i &lt; 8; i++) {
+setOutput(i);
+delayMicroseconds(motorSpeed);
+}
+}
+}
+
+void clockwise()
+{
+for (int i = 0; i &lt; countsperrev; i++) {
+for(int i = 7; i &gt;= 0; i--) {
+setOutput(i);
+delayMicroseconds(motorSpeed);
+}
+}
+}
+void setOutput(int out)
+{
+digitalWrite(motorPin1, bitRead(lookup[out], 0));
+digitalWrite(motorPin2, bitRead(lookup[out], 1));
+digitalWrite(motorPin3, bitRead(lookup[out], 2));
+digitalWrite(motorPin4, bitRead(lookup[out], 3));
+}

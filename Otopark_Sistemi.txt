@@ -1,0 +1,152 @@
+//Bu kodla RFID kart okutulduðunda bariyer 90 º açýyla açýlýp kapanarak giriþe ve çýkýþa
+kontrollü bir þekilde izin verilmektedir. Araba park alanýndayken yukarýdaki ýþýk kýrmýzý
+yanmakta araba park alanýnda deðilken ýþýk yeþil renkte yanmakta ve olasý gaz
+yoðunluðu artýþýna baðlý olarak belirlenen bir seviye üstünde uyarmaktadýr.
+
+#include &lt;SPI.h&gt; // SPI kutuphanesi projeye dahil edildi.
+#include &lt;MFRC522.h&gt; // MFRC522 kutuphanesi projeye dahil edildi.
+#include &lt;EEPROM.h&gt; // EEPROM kutuphanesi projeye dahil edildi.
+#include &lt;Servo.h&gt; // Servo kutuphanesi projeye dahil edildi.
+
+#define echoPin 3 //3 sayýsýný echoPin’e tanýmladýk.
+#define trigPin 4 //4 sayýsýný trigPin’e tanýmladýk.
+#define RST_PIN 9 //9 sayýsýný RST_PIN’e tanýmladýk.
+#define SS_PIN 10 //10 sayýsýný SS_PIN’e tanýmladýk.
+#define ledPinhy 7 //7 sayýsýný ledPinhy’e tanýmladýk.
+#define ledPinhk 8 //8 sayýsýný ledPinhk’e tanýmladýk.
+#define sensor_pin A0 //A0 sayýsýný sensor_pin’e tanýmladýk.
+#define buzzer_pin 5 //5 sayýsýný buzzer_pin’e tanýmladýk.
+#define preheat_time 5000
+#define threshold 300 //Alarmýn çalmasý için gerekli eþik deðerini 300 olarak
+//belirliyoruz.
+long duration;
+int distance;
+int safetyDistance;
+
+MFRC522 mfrc522(SS_PIN, RST_PIN);
+
+
+Servo servoNesnesi;
+String lastRfid = &quot;&quot;;
+String kart1 = &quot;&quot;;
+String kart2 = &quot;&quot;;
+
+MFRC522::MIFARE_Key key;
+
+void setup() //Bu döngü bir kere yapýlýr.
+{
+Serial.begin(9600); //Arduinonun seri haberleþmesini saðlar.
+servoNesnesi.attach(6);
+SPI.begin();
+mfrc522.PCD_Init();
+pinMode(trigPin, OUTPUT); // trigPin çýkýþ olarak tanýmlandý.
+pinMode(echoPin, INPUT); // echoPin çýkýþ olarak tanýmlandý.
+pinMode(ledPinhy, OUTPUT); // ledPinhy çýkýþ olarak tanýmlandý.
+pinMode(ledPinhk, OUTPUT); // ledPinhk çýkýþ olarak tanýmlandý.
+pinMode(buzzer_pin, OUTPUT); // buzzer_pin çýkýþ olarak tanýmlandý.
+}
+void loop()
+{
+label:okuma();
+hc();
+gas();
+goto label;
+}
+
+void test()
+{
+
+
+String crc_table[5] = {&quot;00 F1 8C 7C&quot;, &quot;EC 9B 9B 23&quot;, &quot;2C 52 7A 24&quot;};
+String isim_table[5] = {&quot;Mehmet Ziya Erbaþ 140103033&quot;, &quot;Busra Secmeoglu
+140103028&quot;, &quot;Ramazan Isik 140103014&quot;};
+for(int l=0; l&lt;5; ++l){
+if(crc_table[l]==lastRfid){
+servo();
+return;}
+}
+for(int l=0; l&lt;5; ++l){
+while(crc_table[l]==lastRfid)
+{ ;}
+}
+}
+void servo()
+{
+servoNesnesi.write(90);
+delay(5000);
+servoNesnesi.write(0);
+}
+void okuma ()
+{
+//yeni kart okununmadýkça devam etme
+if ( ! mfrc522.PICC_IsNewCardPresent()){
+return;
+}
+if ( ! mfrc522.PICC_ReadCardSerial()){
+return;
+}
+//kartýn UID&#39;sini oku, rfid isimli string&#39;e kaydet
+String rfid = &quot;&quot;;
+
+for (byte i = 0; i &lt; mfrc522.uid.size; i++)
+{
+rfid += mfrc522.uid.uidByte[i] &lt; 0x10 ? &quot; 0&quot; : &quot; &quot;;
+rfid += String(mfrc522.uid.uidByte[i], HEX);
+}
+//string&#39;in boyutunu ayarla ve tamamýný büyük harfe çevir
+rfid.trim();
+rfid.toUpperCase();
+if (rfid == lastRfid)
+return;
+lastRfid = rfid;
+test();
+delay(5000);
+}
+
+void hc()
+{
+digitalWrite(trigPin, LOW);
+delayMicroseconds(2);
+digitalWrite(trigPin, HIGH);
+delayMicroseconds(10);
+digitalWrite(trigPin, LOW);
+duration = pulseIn(echoPin, HIGH);
+distance= duration*0.034/2;
+safetyDistance = distance;
+if (safetyDistance &lt;= 7){
+digitalWrite(ledPinhk, HIGH);
+digitalWrite(ledPinhy, LOW);
+}
+
+}
+
+else{
+digitalWrite(ledPinhy, HIGH);
+digitalWrite(ledPinhk, LOW);
+}
+// Prints the distance on the Serial Monitor
+}
+
+void gas()
+{
+//analogRead() fonksiyonu ile sensör deðerini ölçüyoruz ve bir deðiþken içerisinde
+tutuyoruz:
+int sensorValue = analogRead(sensor_pin);
+//Sensör deðeri belirlediðimiz eþik deðerinden yüksek ise alarm() fonksiyonunu
+çaðýrýyoruz:
+if (sensorValue &gt;= threshold){
+alarm(100);
+}
+else{
+//Sensör deðerini bilgisayarýmýzdan görebilmek için seri monitöre yazýyoruz:
+delay(1);
+}
+}
+void alarm(unsigned int duration)
+{
+//Buzzer&#39;ýn 440Hz&#39;te (la notasý) ses üretmesini istiyoruz:
+tone(buzzer_pin, 440);
+//Normal durumda yeþil yanmakta olan LED&#39;i söndürüp kýrmýzý renkte yakýyoruz:
+delay(duration);
+noTone(buzzer_pin);
+delay(duration);

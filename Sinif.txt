@@ -1,0 +1,102 @@
+#include &lt;LiquidCrystal.h&gt;
+#include &lt;Wire.h&gt; // Wire kütüphanesini ekliyoruz.
+#include &lt;DS1307new.h&gt; // DS1307new kütüphanesini ekliyoruz.
+int lm35Pin = A0;
+uint16_t startAddr = 0x0000; // NV-RAM&#39;de saklamak için baþlangýç adresi
+
+
+uint16_t lastAddr; // NV-RAM&#39;de saklamak için yeni adres
+uint16_t TimeIsSet = 0xaa55; // Saatin tekrar ayarlanmamasýna yardýmcý olur.
+LiquidCrystal lcd(12, 11, 7, 6, 5, 4);
+void setup()
+{
+Serial.begin(9600);
+lcd.begin(16, 2); /* Kullandigimiz LCDnin sutun ve satir sayisini belirtmeliyiz */
+RTC.setRAM(0, (uint8_t *)&amp;startAddr, sizeof(uint16_t));
+RTC.getRAM(54, (uint8_t *)&amp;TimeIsSet, sizeof(uint16_t));
+if (TimeIsSet != 0xaa55) {
+RTC.stopClock();
+RTC.fillByYMD(2018,5,15);
+RTC.fillByHMS(23,30,0);
+RTC.setTime();
+TimeIsSet = 0xaa55;
+RTC.setRAM(54, (uint8_t *)&amp;TimeIsSet, sizeof(uint16_t));
+RTC.startClock(); }
+else{
+RTC.getTime();}
+analogReference(INTERNAL);
+}
+
+void loop()
+{
+RTC.getTime(); // Saat ve Tarih verilerini al
+if (RTC.hour &lt; 10) {
+lcd.print(&quot;0&quot;);
+lcd.print(RTC.hour, DEC); }
+else{
+lcd.print(RTC.hour, DEC);}
+lcd.print(&quot;:&quot;);
+
+
+if (RTC.minute &lt; 10){
+lcd.print(&quot;0&quot;);
+lcd.print(RTC.minute, DEC)}
+else{
+lcd.print(RTC.minute, DEC); }
+lcd.print(&quot;:&quot;);
+if (RTC.second &lt; 10) {
+lcd.print(&quot;0&quot;);
+lcd.print(RTC.second, DEC);}
+else{
+lcd.print(RTC.second, DEC);}
+lcd.print(&quot; &quot;);
+lcd.setCursor(0, 1); /* Imlecin yeri 1. satir 0. sutun olarak ayarlandi */
+if (RTC.day &lt; 10) {
+lcd.print(&quot;0&quot;);
+lcd.print(RTC.day, DEC);}
+else{
+lcd.print(RTC.day, DEC); }
+lcd.print(&quot;-&quot;);
+if (RTC.month &lt; 10) {
+lcd.print(&quot;0&quot;);
+lcd.print(RTC.month, DEC); }
+else {
+lcd.print(RTC.month, DEC);}
+lcd.print(&quot;-&quot;);
+lcd.print(RTC.year, DEC); // Yýlda herhangi bir deðiþikliðe gerek yok
+lcd.print(&quot; &quot;);
+switch (RTC.dow) // Haftanýn günü
+{
+case 1:
+lcd.print(&quot;PZT&quot;);
+
+
+break;
+case 2:
+lcd.print(&quot;SALÝ&quot;);
+break;
+case 3:
+lcd.print(&quot;CAR&quot;);
+break;
+case 4:
+lcd.print(&quot;PER&quot;);
+break;
+case 5:
+lcd.print(&quot;CUM&quot;);
+break;
+case 6:
+lcd.print(&quot;CTS&quot;);
+break;
+case 7:
+lcd.print(&quot;PAZ&quot;);
+break; }
+lcd.println();
+delay(1000); // 1 saniye bekle
+int sicaklikVolt = analogRead(lm35Pin);
+float sicaklikC = sicaklikC = sicaklikVolt / 9.45;
+lcd.setCursor(6, 0);
+lcd.print(sicaklikC);
+lcd.setCursor(6,1);
+lcd.print(&quot;\337C&quot;);
+delay(3000);
+}

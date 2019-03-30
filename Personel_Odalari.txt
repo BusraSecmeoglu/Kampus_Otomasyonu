@@ -1,0 +1,151 @@
+//Bu kodla sisteme tanýmlanmýþ kiþilerin bu odalara giriþ izni bulunmaktadýr. Servo motor
+yardýmýyla kapý kilidi kontrol edilmektedir.
+
+#include &lt;SPI.h&gt;
+#include &lt;MFRC522.h&gt;
+#include &lt;EEPROM.h&gt;
+#include &lt;Wire.h&gt;
+#include &lt;LiquidCrystal_I2C.h&gt; // I2C kütüphanesini verdiðim linkten indirip include
+edebilirsiniz
+LiquidCrystal_I2C lcd(0x27,16,2);
+#define RST_PIN 9
+#define SS_PIN 10
+MFRC522 mfrc522(SS_PIN, RST_PIN);
+
+String lastRfid = &quot;&quot;;
+String kart1 = &quot;&quot;;
+String kart2 = &quot;&quot;;
+int motorPin1 = 4; // IN 1
+int motorPin2 = 5; // IN 2
+int motorPin3 = 6; // IN 3
+int motorPin4 = 7; // IN 4
+
+int motorSpeed = 1000; //variable to set stepper speed
+int count = 0; // count of steps made
+int countsperrev = 128; // number of steps per revolution for this motor
+int lookup[8] = {B01000, B01100, B00100, B00110, B00010, B00011, B00001, B01001};
+int okuma;
+int c=1;
+
+
+
+MFRC522::MIFARE_Key key;
+
+void setup()
+{
+Serial.begin(9600);
+SPI.begin();
+mfrc522.PCD_Init();
+pinMode(motorPin1, OUTPUT);
+pinMode(motorPin2, OUTPUT);
+pinMode(motorPin3, OUTPUT);
+pinMode(motorPin4, OUTPUT);
+pinMode(3,INPUT);
+lcd.init();
+lcd.backlight();
+lcd.print(&quot;Kartinizi&quot;);
+lcd.setCursor(0,1);
+lcd.print(&quot;okutunuz&quot;);
+}
+void loop()
+{
+//yeni kart okununmadýkça devam etme
+if ( ! mfrc522.PICC_IsNewCardPresent()){
+return;
+}
+if ( ! mfrc522.PICC_ReadCardSerial()){
+return;
+}
+//kartýn UID&#39;sini oku, rfid isimli string&#39;e kaydet
+String rfid = &quot;&quot;;
+for (byte i = 0; i &lt; mfrc522.uid.size; i++){
+rfid += mfrc522.uid.uidByte[i] &lt; 0x10 ? &quot; 0&quot; : &quot; &quot;;
+
+
+rfid += String(mfrc522.uid.uidByte[i], HEX);
+}
+//string&#39;in boyutunu ayarla ve tamamýný büyük harfe çevir
+rfid.trim();
+rfid.toUpperCase();
+
+if (rfid == lastRfid)
+return;
+lastRfid = rfid;
+test();
+delay(1000);
+lastRfid=&quot;0&quot;;
+}
+void test()
+{
+String crc_table[5] = { &quot;2C 52 7A 24&quot;, &quot;EC 9B 9B 23&quot;,&quot;00 F1 8C 7C&quot;,
+&quot;0x3b6e20c8&quot;, &quot;0x26d930ac&quot;};
+String isim_table[5]={&quot;busra&quot;, &quot;aslý&quot;, &quot;merve&quot;, &quot;seda&quot;, &quot;hale&quot;};
+okuma=digitalRead(3);
+if(okuma== HIGH){
+for(int l=0; l&lt;5; ++l){
+if(crc_table[l]==lastRfid){
+lcd.clear();
+lcd.setCursor(0,0);
+lcd.print(&quot;Hosgeldiniz&quot;);
+lcd.setCursor(0,1);
+lcd.print(isim_table[l]);
+clockwise();
+delay(2000);
+while(1){
+okuma=digitalRead(3);
+
+
+if(okuma== HIGH){
+anticlockwise();
+lcd.clear();
+lcd.print(&quot;Kartinizi&quot;);
+lcd.setCursor(0,1);
+lcd.print(&quot;okutunuz&quot;);
+delay(2000);
+}
+}
+return 0;
+}
+}
+}
+else{
+return 0;
+}
+for(int l=0; l&lt;5; ++l){
+while(crc_table[l]==lastRfid){
+;
+}
+}
+lcd.setCursor(0,0);
+lcd.clear();
+lcd.print(&quot;gecersiz&quot;);
+delay(1000);
+lcd.clear();
+lcd.print(&quot;Kartinizi&quot;);
+lcd.setCursor(0,1);
+lcd.print(&quot;okutunuz&quot;);
+}
+
+void anticlockwise()
+{
+for (int i = 0; i &lt; countsperrev; i++) {
+for(int i = 0; i &lt; 8; i++) {
+setOutput(i);
+delayMicroseconds(motorSpeed); }
+}
+}
+void clockwise()
+{
+for (int i = 0; i &lt; countsperrev; i++){
+for(int i = 7; i &gt;= 0; i--){
+setOutput(i);
+delayMicroseconds(motorSpeed); }
+}
+}
+void setOutput(int out)
+{
+digitalWrite(motorPin1, bitRead(lookup[out], 0));
+digitalWrite(motorPin2, bitRead(lookup[out], 1));
+digitalWrite(motorPin3, bitRead(lookup[out], 2));
+digitalWrite(motorPin4, bitRead(lookup[out], 3));
+}
